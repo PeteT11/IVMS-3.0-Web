@@ -1,0 +1,95 @@
+name: Deploy development infrastructure (manual approval)
+on:
+  workflow_dispatch:
+    inputs:
+      approval:
+        description: 'After explicit owner approval, enter DEPLOY IVMS DEVELOPMENT'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: ivms-development-deployment
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/dev/zero-trust-aws' && inputs.approval == 'DEPLOY IVMS DEVELOPMENT'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: infrastructure/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run validate
+      - run: npm run audit:security
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: development
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infrastructure
+    env:
+      AWS_REGION: us-east-1
+      DEV_ACCOUNT_ID: ${{ vars.DEV_ACCOUNT_ID }}
+      VIEWER_DOMAIN: ${{ vars.VIEWER_DOMAIN }}
+      ORIGIN_DOMAIN: ${{ vars.ORIGIN_DOMAIN }}
+      CERTIFICATE_ARN: ${{ vars.CERTIFICATE_ARN }}
+      ENTRA_METADATA_URL: ${{ vars.ENTRA_METADATA_URL }}
+      CLOUDFRONT_PREFIX_LIST_ID: ${{ vars.CLOUDFRONT_PREFIX_LIST_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Check development configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEV_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
+          for name in VIEWER_DOMAIN ORIGIN_DOMAIN CERTIFICATE_ARN ENTRA_METADATA_URL CLOUDFRONT_PREFIX_LIST_ID; do
+            test -n "${!name}"
+          done
+          test "$VIEWER_DOMAIN" != "$ORIGIN_DOMAIN"
+          [[ "$CERTIFICATE_ARN" == "arn:aws:acm:us-east-1:$DEV_ACCOUNT_ID:certificate/"* ]]
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run synth
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.DEV_ACCOUNT_ID }}:role/ivms-development-github
+          aws-region: us-east-1
+          allowed-account-ids: ${{ vars.DEV_ACCOUNT_ID }}
+          role-duration-seconds: 1800
+          role-session-name: ivms-development-${{ github.run_id }}
+          unset-current-credentials: true
+      - name: Verify target account
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(aws sts get-caller-identity --query Account --output text)" = "$DEV_ACCOUNT_ID"
+      - name: Deploy only the development application stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install cdk deploy IvmsDevelopment --exclusively --require-approval never \
+            --parameters "ViewerDomain=$VIEWER_DOMAIN" \
+            --parameters "OriginDomain=$ORIGIN_DOMAIN" \
+            --parameters "CertificateArn=$CERTIFICATE_ARN" \
+            --parameters "EntraMetadataUrl=$ENTRA_METADATA_URL" \
+            --parameters "CloudFrontPrefixListId=$CLOUDFRONT_PREFIX_LIST_ID"

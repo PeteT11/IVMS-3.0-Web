@@ -1,0 +1,5 @@
+infrastructure/node_modules/
+infrastructure/dist/
+infrastructure/cdk.out/
+infrastructure/coverage/
+*.log
