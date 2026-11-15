@@ -1,0 +1,22 @@
+{
+  "name": "ivms-development-infrastructure",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc && node scripts/package-gateway.mjs",
+    "synth": "cdk synth --quiet",
+    "test": "node --test dist/test/*.test.js",
+    "validate": "npm run build && npm run synth && npm test",
+    "audit:security": "npm audit --audit-level=high"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.277.0",
+    "constructs": "10.5.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.159",
+    "@types/node": "22.15.30",
+    "aws-cdk": "2.1148.1",
+    "typescript": "5.9.3"
+  }
+}
