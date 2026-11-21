@@ -18,5 +18,5 @@ $('configure').onclick=()=>$('config').style.display=$('config').style.display==
 let map,traffic;function resizeMap(){if(map&&window.google?.maps)google.maps.event.trigger(map,'resize')}window.initIVMSMap=function(){map=new google.maps.Map($('map'),{center:{lat:52.4862,lng:-1.8904},zoom:12,mapTypeControl:true,streetViewControl:false,fullscreenControl:true});traffic=new google.maps.TrafficLayer();$('trafficLayer').onchange=e=>traffic.setMap(e.target.checked?map:null);new ResizeObserver(resizeMap).observe($('map'))};
 </script>
 <!-- Replace YOUR_GOOGLE_MAPS_API_KEY with a browser-restricted key; enable Maps JavaScript API. -->
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initIVMSMap"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD_GBPq7_C_MOV1sQ3LekIF7oVCkSspOjQ&callback=initIVMSMap"></script>
 </body></html>
